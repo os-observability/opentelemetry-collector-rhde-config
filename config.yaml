@@ -1,0 +1,155 @@
+---
+receivers:
+  journald:
+    units:
+      - sshd # Example unit, more can be added
+    priority: info
+  filelog:
+    include:
+      - /var/log/pods/*/*/*.log
+    exclude:
+      # Exclude logs from all containers named otel-collector
+      - /var/log/pods/*/otel-collector/*.log
+    start_at: beginning
+    include_file_path: true
+    include_file_name: false
+    operators:
+      # Find out which format is used by kubernetes
+      - type: router
+        id: get-format
+        routes:
+          - output: parser-docker
+            expr: 'body matches "^\\{"'
+          - output: parser-crio
+            expr: 'body matches "^[^ Z]+ "'
+          - output: parser-containerd
+            expr: 'body matches "^[^ Z]+Z"'
+      # Parse CRI-O format
+      - type: regex_parser
+        id: parser-crio
+        regex: '^(?P<time>[^ Z]+) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) ?(?P<log>.*)$'
+        output: extract_metadata_from_filepath
+        timestamp:
+          parse_from: attributes.time
+          layout_type: gotime
+          layout: '2006-01-02T15:04:05.999999999Z07:00'
+      # Parse CRI-Containerd format
+      - type: regex_parser
+        id: parser-containerd
+        regex: '^(?P<time>[^ ^Z]+Z) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) ?(?P<log>.*)$'
+        output: extract_metadata_from_filepath
+        timestamp:
+          parse_from: attributes.time
+          layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+      # Parse Docker format
+      - type: json_parser
+        id: parser-docker
+        output: extract_metadata_from_filepath
+        timestamp:
+          parse_from: attributes.time
+          layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+      - type: move
+        from: attributes.log
+        to: body
+      # Extract metadata from file path
+      - type: regex_parser
+        id: extract_metadata_from_filepath
+        regex: '^.*\/(?P<namespace>[^_]+)_(?P<pod_name>[^_]+)_(?P<uid>[a-f0-9\-]{36})\/(?P<container_name>[^\._]+)\/(?P<restart_count>\d+)\.log$'
+        parse_from: attributes["log.file.path"]
+      # Rename attributes
+      - type: move
+        from: attributes.stream
+        to: attributes["log.iostream"]
+      - type: move
+        from: attributes.container_name
+        to: resource["k8s.container.name"]
+      - type: move
+        from: attributes.namespace
+        to: resource["k8s.namespace.name"]
+      - type: move
+        from: attributes.pod_name
+        to: resource["k8s.pod.name"]
+      - type: move
+        from: attributes.restart_count
+        to: resource["k8s.container.restart_count"]
+      - type: move
+        from: attributes.uid
+        to: resource["k8s.pod.uid"]
+  otlp/workload:
+    protocols:
+      grpc:
+      http:
+  k8s_cluster:
+    auth_type: kubeConfig
+    distribution: openshift
+    collection_interval: 10s
+    node_conditions_to_report: [Ready, MemoryPressure]
+    allocatable_types_to_report: [cpu, memory]
+  k8s_events:
+    auth_type: kubeConfig
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 10s
+    scrapers:
+      cpu:
+      memory:
+  hostmetrics/disk:
+    root_path: /hostfs
+    collection_interval: 30s
+    scrapers:
+      disk:
+      filesystem:
+processors:
+  resourcedetection/system:
+    detectors: ["system"]
+  batch:
+  attributes/k8s:
+    actions:
+     - action: insert
+       key: log_file_name
+       from_attribute: log.file.name
+     - action: insert
+       key: loki.attribute.labels
+       value: log_file_name
+
+connectors:
+  forward/logs:
+  forward/metrics:
+
+exporters:
+  debug:
+
+service:
+  pipelines:
+    metrics/workload:
+      receivers: [otlp/workload]
+      exporters: [forward/metrics]
+    metrics/k8s:
+      receivers: [k8s_cluster]
+      exporters: [forward/metrics]
+    logs/workload:
+      receivers: [otlp/workload]
+      exporters: [forward/logs]
+    logs/k8s_events:
+      receivers: [k8s_cluster, k8s_events]
+      exporters: [forward/logs]
+    logs/k8s:
+      receivers: [filelog]
+      processors: [attributes/k8s]
+      exporters: [forward/logs]
+    logs/journald:
+      receivers: [journald]
+      exporters: [forward/logs]
+
+    traces/workload:
+      receivers: [otlp/workload]
+      processors: [resourcedetection/system, batch]
+      exporters: [debug]
+    log/forward:
+      receivers: [forward/logs]
+      processors: [resourcedetection/system, batch]
+      exporters: [debug]
+    metric/forward:
+      receivers: [forward/metrics]
+      processors: [resourcedetection/system, batch]
+      exporters: [debug]
