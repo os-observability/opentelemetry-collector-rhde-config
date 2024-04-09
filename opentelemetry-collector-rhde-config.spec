@@ -1,4 +1,4 @@
-Name: opentelemetry-collector-cloudwatch-config
+Name: opentelemetry-collector-rhde-config
 Version: 1.0
 Release: 1%{?dist}
 Summary: RHDE Observability Agent
