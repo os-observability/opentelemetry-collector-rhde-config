@@ -20,3 +20,16 @@ fedpkg --release f37 mockbuild
 ```
 
 Then upload the source RPM into Copr and build it there.
+
+Install and uninstall: 
+```bash
+sudo rpm -i opentelemetry-collector-rhde-config-1.0-1.fc39.noarch.rpm 
+sudo dnf remove opentelemetry-collector-rhde-config.noarch
+```
+
+List and start systemd service
+```bash
+sudo systemctl list-unit-files --all | grep opentelemetry
+sudo systemctl start opentelemetry-collector-rhde-config.service
+journalctl -u opentelemetry-collector-rhde-config.service
+```
