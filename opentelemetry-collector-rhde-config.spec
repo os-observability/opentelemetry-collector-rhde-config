@@ -22,16 +22,13 @@ RHDE observability agent configuration.
 # create expected directory layout
 mkdir -p %{buildroot}%{_sysconfdir}/opentelemetry-collector-rhde-config
 mkdir -p %{buildroot}%{_unitdir}
-# TODO install default user for the collector and grant permission. Have access to systemd logs.
-# TODO have access to microshift logs.
-# TODO have access to proc for metrics.
 
 # install files
-# TODO install collector k8s service in the microshift folder
-# TODO what is the directory where to install the service
 install -p -m 0644 -D %{SOURCE1} %{buildroot}%{_sysconfdir}/opentelemetry-collector-rhde-config/config.yaml
 install -p -m 0644 -D %{SOURCE2} %{buildroot}%{_unitdir}/%{name}.service
 
+# TODO give access to microshift logs
+# TODO give access to proc for metrics
 %pre
 /usr/bin/getent group rhde-observability > /dev/null || /usr/sbin/groupadd -r rhde-observability
 /usr/bin/getent passwd rhde-observability > /dev/null || /usr/sbin/useradd -r -d /path/to/program -s /sbin/nologin -g rhde-observability rhde-observability
