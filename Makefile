@@ -7,12 +7,12 @@ RPM_TARGET := rpm
 SOURCE_FILES := config.yaml
 
 $(RPM_TARGET): $(addprefix $(SOURCES_DIR)/,$(SOURCE_FILES))
-    rpmbuild -ba $(RPM_SPEC_FILE)
+	rpmbuild -ba $(RPM_SPEC_FILE)
 
 $(SOURCES_DIR)/%.yaml: %.yaml
-    cp $< $@
+	cp $< $@
 
 copr: $(addprefix $(SOURCES_DIR)/,$(SOURCE_FILES))
-    rpmbuild -bs $(RPM_SPEC_FILE)
-    copr-cli build miyunari/opentelemetry-collector-rhde-config SRPMS/opentelemetry-collector-rhde-config-1.0-1.fc39.src.rpm
+	rpmbuild -bs $(RPM_SPEC_FILE)
+	copr-cli build miyunari/opentelemetry-collector-rhde-config SRPMS/opentelemetry-collector-rhde-config-1.0-1.fc39.src.rpm
 
