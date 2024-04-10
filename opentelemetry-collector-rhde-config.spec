@@ -12,6 +12,9 @@ Source2: opentelemetry-collector-rhde-config.service
 BuildRequires: systemd
 Requires: opentelemetry-collector
 
+Requires(pre): /usr/sbin/useradd, /usr/bin/getent
+Requires(postun): /usr/sbin/userdel
+
 %description
 RHDE observability agent configuration.
 
@@ -28,6 +31,13 @@ mkdir -p %{buildroot}%{_unitdir}
 # TODO what is the directory where to install the service
 install -p -m 0644 -D %{SOURCE1} %{buildroot}%{_sysconfdir}/opentelemetry-collector-rhde-config/config.yaml
 install -p -m 0644 -D %{SOURCE2} %{buildroot}%{_unitdir}/%{name}.service
+
+%pre
+/usr/bin/getent group rhde-observability > /dev/null || /usr/sbin/groupadd -r rhde-observability
+/usr/bin/getent passwd rhde-observability > /dev/null || /usr/sbin/useradd -r -d /path/to/program -s /sbin/nologin -g rhde-observability rhde-observability
+
+%postun
+/usr/sbin/userdel rhde-observability
 
 %post
 /bin/systemctl --system daemon-reload 2>&1
