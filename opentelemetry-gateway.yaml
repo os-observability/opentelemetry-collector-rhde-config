@@ -1,0 +1,122 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opentelemetry-gateway-config
+  namespace: observability
+data:
+  # TODO: add k8s/microshift specific configuration
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+          http:
+    processors:
+      batch:
+        send_batch_size: 10000
+        timeout: 10s
+    exporters:
+      otlp/host:
+        endpoint: localhost:4317
+        tls:
+          insecure: true
+          insecure_skip_verify: true
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp/host]
+        metrics:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp/host]
+        logs:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp/host]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: opentelemetry-gateway
+  namespace: observability
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hostnetwork-v2-scc-opentelemetry-gateway
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:hostnetwork-v2
+subjects:
+- kind: ServiceAccount
+  name: opentelemetry-gateway
+  namespace: observability
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: opentelemetry-gateway
+  namespace: observability
+  labels:
+    app: opentelemetry-gateway
+spec:
+  selector:
+    matchLabels:
+      app: opentelemetry-gateway
+  template:
+    metadata:
+      labels:
+        app: opentelemetry-gateway
+    spec:
+      # NOTE: Use port 54317 and 54318 to avoid a conflict with the collector on the host.
+      serviceAccount: opentelemetry-gateway
+      serviceAccountName: opentelemetry-gateway
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+      - name: opentelemetry-collector
+        image: registry.redhat.io/rhosdt/opentelemetry-collector-rhel8:0.93.0
+        command: ["/go/bin/otelcol-linux", "--config=/etc/opentelemetry/config.yaml"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/opentelemetry
+      volumes:
+      - name: config-volume
+        configMap:
+          name: opentelemetry-gateway-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: observability
+spec:
+  ports:
+    - name: http-otlp
+      port: 4318
+      targetPort: 54318
+      protocol: TCP
+    - name: grpc-otlp
+      port: 4317
+      targetPort: 54317
+      protocol: TCP
+  selector:
+    app: opentelemetry-gateway

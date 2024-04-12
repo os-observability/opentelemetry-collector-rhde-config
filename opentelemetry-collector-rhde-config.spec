@@ -1,12 +1,14 @@
 Name: opentelemetry-collector-rhde-config
 Version: 1.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 Summary: RHDE Observability Agent
 BuildArch: noarch
 
 License: Apache-2.0
 Source1: config.yaml
 Source2: opentelemetry-collector-rhde-config.service
+Source3: opentelemetry-gateway.yaml
+Source4: kustomization.yaml
 
 # Necessary to access the systemd macros
 BuildRequires: systemd
@@ -26,6 +28,8 @@ mkdir -p %{buildroot}%{_unitdir}
 # install files
 install -p -m 0644 -D %{SOURCE1} %{buildroot}%{_sysconfdir}/opentelemetry-collector-rhde-config/config.yaml
 install -p -m 0644 -D %{SOURCE2} %{buildroot}%{_unitdir}/%{name}.service
+install -p -m 0644 -D %{SOURCE3} %{buildroot}%{_sysconfdir}/microshift/manifests/opentelemetry-gateway.yaml
+install -p -m 0644 -D %{SOURCE4} %{buildroot}%{_sysconfdir}/microshift/manifests/kustomization.yaml
 
 # TODO give access to microshift logs
 # TODO give access to proc for metrics
@@ -54,7 +58,11 @@ fi
 %files
 %{_unitdir}/%{name}.service
 %{_sysconfdir}/opentelemetry-collector-rhde-config/config.yaml
+%{_sysconfdir}/microshift/manifests/opentelemetry-gateway.yaml
+%{_sysconfdir}/microshift/manifests/kustomization.yaml
 
 %changelog
+* Fri Apr 12 2024 Benedikt Bongartz <bongartz@redhat.com> - 1.0-2
+- add microshift manifests
 * Fri Jan 26 2024 Benedikt Bongartz <bongartz@redhat.com> - 1.0-1
 - initialize package
