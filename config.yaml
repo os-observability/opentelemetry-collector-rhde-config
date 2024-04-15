@@ -1,3 +1,4 @@
+---
 receivers:
   otlp:
     protocols:
@@ -21,12 +22,10 @@ receivers:
       disk:
       filesystem:
 
-
 processors:
   batch:
   resourcedetection/system:
     detectors: ["system"]
-
 
 exporters:
   debug:
