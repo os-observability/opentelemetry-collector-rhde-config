@@ -1,9 +1,9 @@
 ---
 receivers:
-  otlp:
+  otlp/microshift:
     protocols:
       grpc:
-      http:
+        endpoint: "10.44.0.0:54317"
 
   journald:
     units:
@@ -33,10 +33,10 @@ exporters:
 service:
   pipelines:
     metrics:
-      receivers: [otlp, hostmetrics, hostmetrics/disk]
+      receivers: [otlp/microshift, hostmetrics, hostmetrics/disk]
       processors: [resourcedetection/system, batch]
       exporters: [debug]
     logs:
-      receivers: [otlp, journald]
+      receivers: [otlp/microshift, journald]
       processors: [resourcedetection/system, batch]
       exporters: [debug]

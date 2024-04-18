@@ -10,9 +10,14 @@ metadata:
   name: opentelemetry-gateway-config
   namespace: observability
 data:
-  # TODO: add k8s/microshift specific configuration
+# TODO: remove hostnetwork-v2 scc and flip exporter config fromlocalhost to ${env:K8S_HOST_IP}.
   config.yaml: |
     receivers:
+      kubeletstats:
+        collection_interval: 20s
+        auth_type: "serviceAccount"
+        endpoint: "https://${env:K8S_HOST_IP}:10250"
+        insecure_skip_verify: true
       otlp:
         protocols:
           grpc:
@@ -23,7 +28,7 @@ data:
         timeout: 10s
     exporters:
       otlp/host:
-        endpoint: localhost:4317
+        endpoint: ${env:K8S_HOST_IP}:54317
         tls:
           insecure: true
           insecure_skip_verify: true
@@ -34,7 +39,7 @@ data:
           processors: [batch]
           exporters: [otlp/host]
         metrics:
-          receivers: [otlp]
+          receivers: [otlp, kubeletstats]
           processors: [batch]
           exporters: [otlp/host]
         logs:
@@ -61,6 +66,28 @@ subjects:
   name: opentelemetry-gateway
   namespace: observability
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: otel-apiserver
+rules:
+  - apiGroups: ['']
+    resources: ['nodes/stats']
+    verbs: ['get', 'watch', 'list']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: otel-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: otel-apiserver
+subjects:
+  - kind: ServiceAccount
+    name: opentelemetry-gateway
+    namespace: observability
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -77,16 +104,16 @@ spec:
       labels:
         app: opentelemetry-gateway
     spec:
-      # NOTE: Use port 54317 and 54318 to avoid a conflict with the collector on the host.
-      serviceAccount: opentelemetry-gateway
       serviceAccountName: opentelemetry-gateway
-      hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
       containers:
       - name: opentelemetry-collector
-        image: registry.redhat.io/rhosdt/opentelemetry-collector-rhel8:0.93.0
-        command: ["/go/bin/otelcol-linux", "--config=/etc/opentelemetry/config.yaml"]
+        image: ghcr.io/os-observability/redhat-opentelemetry-collector/redhat-opentelemetry-collector:main
+        command: ["/otelcol", "--config=/etc/opentelemetry/config.yaml"]
+        # TODO: enable after 3.1 release
+        # image: registry.redhat.io/rhosdt/opentelemetry-collector-rhel8:0.93.0
+        # command: ["/go/bin/otelcol-linux", "--config=/etc/opentelemetry/config.yaml"]
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
@@ -98,6 +125,11 @@ spec:
         volumeMounts:
         - name: config-volume
           mountPath: /etc/opentelemetry
+        env:
+        - name: K8S_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
       volumes:
       - name: config-volume
         configMap:
