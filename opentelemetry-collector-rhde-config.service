@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/opentelemetry-collector --config /etc/opentelemetry-collector-rhde-config/config.yaml
+ExecStart=/usr/bin/opentelemetry-collector-with-options
 User=rhde-observability
 Group=rhde-observability
 Restart=on-failure
@@ -12,5 +12,3 @@ RestartSec=30
 
 [Install]
 WantedBy=multi-user.target
-
-# TODO run this service with a user that is defined in the .spec file
