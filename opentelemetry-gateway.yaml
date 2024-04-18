@@ -10,7 +10,7 @@ metadata:
   name: opentelemetry-gateway-config
   namespace: observability
 data:
-  # TODO: remove hostnetwork-v2 scc and flip exporter config fromlocalhost to ${env:K8S_NODE_NAME}.
+# TODO: remove hostnetwork-v2 scc and flip exporter config fromlocalhost to ${env:K8S_HOST_IP}.
   config.yaml: |
     receivers:
       kubeletstats:
