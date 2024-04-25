@@ -54,19 +54,6 @@ metadata:
   namespace: observability
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: hostnetwork-v2-scc-opentelemetry-gateway
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:openshift:scc:hostnetwork-v2
-subjects:
-- kind: ServiceAccount
-  name: opentelemetry-gateway
-  namespace: observability
----
-apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: otel-apiserver
